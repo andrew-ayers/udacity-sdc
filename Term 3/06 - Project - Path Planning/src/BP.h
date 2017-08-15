@@ -14,17 +14,20 @@ class BP {
 
   // At each timestep, ego can set acceleration to value between
   // -MAX_ACCEL and MAX_ACCEL
-  int EGO_MAX_ACCEL = 1;
+  int EGO_MAX_ACCEL = 11;  // 11 * .02 = .22, close to the 0.224 value from walkthru
 
   // Lane in which ego starts in
   int EGO_START_LANE = 1;
+
+  // S-value the simulated car starts at
+  double EGO_START_S = 124.834;
 
  public:
   BP();
 
   virtual ~BP();
 
-  void advance(vector<vector<double>> sensor_fusion);
+  void advance(vector<vector<double>> sensor_fusion, double ego_s = 0);
 
   Vehicle get_ego();
 };

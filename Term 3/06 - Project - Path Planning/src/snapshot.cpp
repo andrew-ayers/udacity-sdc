@@ -4,7 +4,7 @@
 /**
  * Initializes Snapshot
  */
-Snapshot::Snapshot(int lane, int s, int v, int a, string state) {
+Snapshot::Snapshot(int lane, double s, double v, double a, string state) {
   this->lane = lane;
   this->s = s;
   this->v = v;

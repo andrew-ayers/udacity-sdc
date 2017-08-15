@@ -9,18 +9,17 @@
 #include <map>
 #include <string>
 #include <iterator>
-//#include "vehicle.h"
 #include "snapshot.h"
 
 using namespace std;
 
 struct TrajectoryData {
   int proposed_lane;
-  int avg_speed;
-  int max_acceleration;
-  int closest_approach;
+  double avg_speed;
+  double max_acceleration;
+  double closest_approach;
   bool collides;
-  int collides_at;
+  double collides_at;
 };
 
 // priority levels for costs
@@ -46,13 +45,13 @@ class Cost {
    */
   virtual ~Cost();
 
-  int calculate_cost(Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions);
+  int calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions);
 
   TrajectoryData get_helper_data(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions);
 
   map<int, vector<vector<int>>> filter_predictions_by_lane(map<int, vector<vector<int>>> predictions, int lane);
 
-  bool check_collision(Snapshot snapshot, int s_previous, int s_now);
+  bool check_collision(Snapshot snapshot, double s_previous, double s_now);
 
   int inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);
   int collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);

@@ -49,7 +49,7 @@ vector<double> PP::Solve(vector<double> car_data,
 
   if (this->previous_path_size > 0) this->car_s = this->end_path_sd[0];
 
-  this->bplanner.advance(sensor_fusion);
+  this->bplanner.advance(sensor_fusion, this->car_s);  // pass in simulator reported s-value to sync up ego s-value
 
   // Convert the solution to a vector
   vector<double> path = this->GeneratePath();
@@ -69,7 +69,6 @@ vector<double> PP::GeneratePath() {
   // ego.target_speed;
   // ego.state;
 
-  //this->car_s = ego.s;
   this->car_ref_vel = static_cast<double>(ego.v);
   this->car_lane = ego.lane;
 

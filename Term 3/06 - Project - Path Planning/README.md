@@ -1,3 +1,7 @@
+# !!!! THIS CODE IS NOT COMPLETE - USE AND ABUSE AT YER OWN RISK !!!!
+
+See this thread: https://discussions.udacity.com/t/need-assistance-what-is-wrong-and-am-i-on-the-right-track-so-to-speak/339426
+
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
    

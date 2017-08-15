@@ -7,15 +7,15 @@ using namespace std;
 class Snapshot {
  public:
   int lane;
-  int s;
-  int v;
-  int a;
+  double s;
+  double v;
+  double a;
   string state;
 
   /**
   * Constructor
   */
-  Snapshot(int lane, int s, int v, int a, string state);
+  Snapshot(int lane, double s, double v, double a, string state);
 
   /**
   * Destructor

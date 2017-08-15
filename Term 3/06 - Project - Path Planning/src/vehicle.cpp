@@ -11,7 +11,7 @@
 /**
  * Initializes Vehicle
  */
-Vehicle::Vehicle(int lane, int s, double v, double a) {
+Vehicle::Vehicle(int lane, double s, double v, double a) {
     this->lane = lane;
     this->s = s;
     this->v = v;
@@ -24,7 +24,7 @@ Vehicle::Vehicle(int lane, int s, double v, double a) {
 
 Vehicle::~Vehicle() {}
 
-void Vehicle::update(int lane, int s, double v, double a) {
+void Vehicle::update(int lane, double s, double v, double a) {
   this->lane = lane;
   this->s = s;
   this->v = v;
@@ -82,23 +82,20 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
   vector<int> new_costs;
   string best = "KL";
 
-  bool dothis = true;
-  if (dothis) {
-    for (int i = 0; i < states.size(); i++) {
-      string state = states[i];
+  for (int i = 0; i < states.size(); i++) {
+    string state = states[i];
 
-      // map<int, vector <vector<int>>> predictions_copy = predictions;
+    // map<int, vector <vector<int>>> predictions_copy = predictions;
 
-      vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions);
+    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions);
 
-      int cost = this->cost.calculate_cost(*this, trajectories, predictions);
+    int cost = this->cost.calculate_cost(*this, trajectories, predictions);
 
-      new_states.insert(new_states.end(), state);
-      new_costs.insert(new_costs.end(), cost);
-    }
-
-    best = this->min_cost_state(states, new_costs);
+    new_states.insert(new_states.end(), state);
+    new_costs.insert(new_costs.end(), cost);
   }
+
+  best = this->min_cost_state(states, new_costs);
 
   return best;
 }
@@ -172,7 +169,7 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
   return trajectories;
 }
 
-void Vehicle::configure(vector<int> road_data) {
+void Vehicle::configure(vector<double> road_data) {
   /*
    Called by simulator before simulation begins. Sets various
    parameters which will impact the ego vehicle.
@@ -180,7 +177,7 @@ void Vehicle::configure(vector<int> road_data) {
 
   // configuration data: speed limit, num_lanes, max_acceleration
   this->target_speed = road_data[0];
-  this->lanes_available = road_data[1];
+  this->lanes_available = static_cast<int>(road_data[1]);
   this->max_acceleration = road_data[2];
 }
 
@@ -195,9 +192,13 @@ string Vehicle::display() {
   return oss.str();
 }
 
-void Vehicle::increment(int dt) {
+// NOTE: we skip the calculation of the s-value when we
+// are "fer-realz" incrementing; otherwise calculated
+// s-value gets out of sync quickly with the actual
+// s-value from the simulator
+void Vehicle::increment(int dt, bool skip_s) {
   double ddt = static_cast<double>(dt) * 0.02;
-  this->s += static_cast<int>(this->v * ddt);
+  if (!skip_s) this->s += this->v * ddt;
   this->v += this->a * ddt;
 }
 
@@ -263,29 +264,35 @@ void Vehicle::realize_constant_speed() {
 }
 
 void Vehicle::realize_keep_lane(map<int, vector<vector<int>>> predictions) {
-  this->a = _max_accel_for_lane(predictions, this->lane, this->s);
+  this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
 
 void Vehicle::realize_lane_change(map<int, vector<vector<int>>> predictions, string direction) {
-  int delta = -1;
+  double delta = -1;
 
   if (direction.compare("L") == 0) {
     delta = 1;
   }
 
   this->lane += delta;
-  int lane = this->lane;
-  int s = this->s;
-  this->a = _max_accel_for_lane(predictions, lane, s);
+
+  this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
 
-double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, int s) {
+double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, double s) {
   double delta_v_til_target = this->target_speed - this->v;
   double max_acc = min(this->max_acceleration, delta_v_til_target);
 
-  //cout << "DVTT: " << delta_v_til_target << ", MAX_ACC: " << max_acc << endl;
+  // cout << "DVTT: " << delta_v_til_target << ", MAX_ACC: " << max_acc << endl;
 
-  /*
+  // NOTE: For some reason, this code which is supposed to be handling decceleration of the ego
+  // vehicle when it approaches the rear of another vehicle, it will sometimes cause the
+  // (acceleration? velocity? both?) to go negative or something, ultimately causing a segfault
+  // with the spline algorithm in the path planner...need to research (but it does seem to work
+  // otherwise). It may be that min-s is set too agressive? Or maybe negative acceleration should
+  // not be allowed to go too low? Maybe -5 to 11 instead of -11 to 11 as currently set?
+
+  #if 0
   map<int, vector<vector<int>>>::iterator it = predictions.begin();
   vector<vector<vector<int>>> in_front;
 
@@ -320,8 +327,9 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
 
     max_acc = min(max_acc, available_room);
   }
-  cout << "DVTT: " << delta_v_til_target << ", MAX_ACC: " << max_acc << endl;
-  */
+  // cout << "DVTT: " << delta_v_til_target << ", MAX_ACC: " << max_acc << endl;
+  #endif
+
   return max_acc;
 }
 
@@ -361,12 +369,12 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions
       }
     }
 
-    int target_vel = nearest_behind[1][1] - nearest_behind[0][1];
-    double delta_v = static_cast<double>(this->v - target_vel);
-    double delta_s = static_cast<double>(this->s - nearest_behind[0][1]);
+    double target_vel = static_cast<double>(nearest_behind[1][1] - nearest_behind[0][1]);
+    double delta_v = this->v - target_vel;
+    double delta_s = this->s - static_cast<double>(nearest_behind[0][1]);
 
     if (delta_v != 0) {
-      double time = -2 * delta_s / delta_v;
+      double time = -2.0 * delta_s / delta_v;
       double a;
 
       if (time == 0) {

@@ -26,20 +26,22 @@ class Vehicle {
 
   struct snapshot {
     int lane;
-    int s;
-    int v;
-    int a;
+    double s;
+    double v;
+    double a;
     string state;
   };
 
+  bool is_ego = false;
   int preferred_buffer = 100;  // impacts "keep lane" behavior.
 
+  int lanes_available;
   int lane;
-  int s;
+
+  double s;
   double v;
   double a;
   double target_speed;
-  int lanes_available;
   double max_acceleration;
 
   string state;
@@ -47,14 +49,14 @@ class Vehicle {
   /**
    * Constructor
    */
-  Vehicle(int lane, int s, double v, double a = 0);
+  Vehicle(int lane, double s, double v, double a = 0);
 
   /**
    * Destructor
    */
   virtual ~Vehicle();
 
-  void update(int lane, int s, double v, double a);
+  void update(int lane, double s, double v, double a);
 
   void update_state(map<int, vector <vector<int>>> predictions);
 
@@ -64,11 +66,11 @@ class Vehicle {
 
   vector<Snapshot> trajectories_for_state(string state, map<int, vector <vector<int>>> predictions, int horizon = 5);
 
-  void configure(vector<int> road_data);
+  void configure(vector<double> road_data);
 
   string display();
 
-  void increment(int dt = 1);
+  void increment(int dt = 1, bool skip_s = false);
 
   vector<double> state_at(int t);
 
@@ -80,7 +82,7 @@ class Vehicle {
 
   void realize_constant_speed();
 
-  double _max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, int s);
+  double _max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, double s);
 
   void realize_keep_lane(map<int, vector< vector<int>>> predictions);
 

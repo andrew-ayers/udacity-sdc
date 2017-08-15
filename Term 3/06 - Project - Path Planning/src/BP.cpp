@@ -11,17 +11,17 @@
 BP::BP() {
   this->road = Road();
 
-  vector<int> ego_config = {this->road.speed_limit, this->road.num_lanes, this->EGO_MAX_ACCEL};
+  vector<double> ego_config = {this->road.speed_limit, static_cast<double>(this->road.num_lanes), static_cast<double>(this->EGO_MAX_ACCEL)};
 
   this->road.add_ego(this->EGO_START_LANE, 0, ego_config);
 }
 
 BP::~BP() {}
 
-void BP::advance(vector<vector<double>> sensor_fusion) {
+void BP::advance(vector<vector<double>> sensor_fusion, double ego_s) {
   this->road.populate_traffic(sensor_fusion);
 
-  this->road.advance();
+  this->road.advance(ego_s);  // pass in simulator reported s-value to sync up ego s-value
 }
 
 Vehicle BP::get_ego() {

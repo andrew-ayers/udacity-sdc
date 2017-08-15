@@ -21,9 +21,7 @@ class Road {
 
   int num_lanes = 3;
 
-  vector<int> lane_speeds = {50, 50, 50};
-
-  int speed_limit = 50; //49.75
+  double speed_limit = 49.75;  // max speed for ego vehicle
 
   map<int, Vehicle> vehicles;
 
@@ -43,8 +41,8 @@ class Road {
 
   void populate_traffic(vector<vector<double>> sensor_fusion);
 
-  void advance();
+  void advance(double ego_s = 0);
 
-  void add_ego(int lane_num, int s, vector<int> config_data);
+  void add_ego(int lane_num, double s, vector<double> config_data);
 };
 #endif /* ROAD_H */

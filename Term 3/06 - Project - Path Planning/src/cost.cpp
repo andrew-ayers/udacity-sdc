@@ -10,15 +10,15 @@
 Cost::Cost() {}
 Cost::~Cost() {}
 
-int Cost::calculate_cost(Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector <vector<int>>> predictions) {
+int Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector <vector<int>>> predictions) {
   TrajectoryData trajectory_data = this->get_helper_data(vehicle, trajectories, predictions);
 
   int cost = 0;
 
   cost += this->inefficiency_cost(vehicle, trajectories, predictions, trajectory_data);
   cost += this->collision_cost(vehicle, trajectories, predictions, trajectory_data);
-  //cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
-  //cout << "****************************" << endl;
+  // cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
+  // cout << "****************************" << endl;
 
   return cost;
 }
@@ -32,16 +32,16 @@ TrajectoryData Cost::get_helper_data(Vehicle vehicle, vector<Snapshot> trajector
   Snapshot first = t[1];
   Snapshot last = t[t.size() - 1];
 
-  int dt = trajectories.size();
+  double dt = trajectories.size();
 
   trajectory_data.proposed_lane = first.lane;
 
   trajectory_data.avg_speed = (last.s - current_snapshot.s) / dt;
 
   // initialize a bunch of variables
-  vector<int> accels;
+  vector<double> accels;
 
-  int closest_approach = 9999999;
+  double closest_approach = 9999999.0;
   bool collides = false;
 
   map<int, vector<vector<int>>> filtered = this->filter_predictions_by_lane(predictions, trajectory_data.proposed_lane);
@@ -63,7 +63,7 @@ TrajectoryData Cost::get_helper_data(Vehicle vehicle, vector<Snapshot> trajector
       bool vehicle_collides = this->check_collision(snapshot, last_state[1], state[1]);
       if (vehicle_collides) {
         trajectory_data.collides = true;
-        trajectory_data.collides_at = i;
+        trajectory_data.collides_at = static_cast<double>(i);
       }
 
       int dist = abs(state[1] - snapshot.s);
@@ -102,8 +102,8 @@ map<int, vector<vector<int>>> Cost::filter_predictions_by_lane(map<int, vector <
   return filtered;
 }
 
-bool Cost::check_collision(Snapshot snapshot, int s_previous, int s_now) {
-  int v_target = s_now - s_previous;
+bool Cost::check_collision(Snapshot snapshot, double s_previous, double s_now) {
+  double v_target = s_now - s_previous;
 
   if (s_previous < snapshot.s) return (s_now >= snapshot.s);
   if (s_previous > snapshot.s) return (s_now <= snapshot.s);
@@ -113,33 +113,33 @@ bool Cost::check_collision(Snapshot snapshot, int s_previous, int s_now) {
 }
 
 int Cost::inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
-  int speed = data.avg_speed;
-  int target_speed = vehicle.target_speed;
-  int diff = target_speed - speed;
-  int pct = diff / target_speed;
-  int multiplier = pct * pct;
-  return multiplier * EFFICIENCY;
+  double speed = data.avg_speed;
+  double target_speed = vehicle.target_speed;
+  double diff = target_speed - speed;
+  double pct = diff / target_speed;
+  double multiplier = pct * pct;
+  return static_cast<int>(multiplier) * EFFICIENCY;
 }
 
 int Cost::collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
   if (data.collides) {
-    int time_til_collision = data.collides_at;
-    int exponent = time_til_collision * time_til_collision;
-    int mult = exp(-exponent);
-    return mult * COLLISION;
+    double time_til_collision = data.collides_at;
+    double exponent = time_til_collision * time_til_collision;
+    double multiplier = exp(-exponent);
+    return static_cast<int>(multiplier) * COLLISION;
   }
 
   return 0;
 }
 
 int Cost::buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
-  int closest = data.closest_approach;
+  double closest = data.closest_approach;
   if (closest == 0) return 10 * DANGER;
 
-  int timesteps_away = closest / data.avg_speed;
+  double timesteps_away = closest / data.avg_speed;
   if (timesteps_away > DESIRED_BUFFER) return 0;
 
-  int multiplier = 1 - pow((timesteps_away / DESIRED_BUFFER), 2);
+  double multiplier = 1 - pow((timesteps_away / static_cast<int>(DESIRED_BUFFER)), 2);
 
-  return multiplier * DANGER;
+  return static_cast<int>(multiplier) * DANGER;
 }
