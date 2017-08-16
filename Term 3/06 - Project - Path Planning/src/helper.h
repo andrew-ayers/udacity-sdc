@@ -28,4 +28,6 @@ int getLaneNumber(double d);
 
 int getLaneFrenet(int lane, int offset);
 
+int minmaxCarLaneNumber(int lane);
+
 #endif /* HELPER_H */

@@ -33,7 +33,7 @@ class Vehicle {
   };
 
   bool is_ego = false;
-  int preferred_buffer = 100;  // impacts "keep lane" behavior.
+  int preferred_buffer = 5;  // impacts "keep lane" behavior.
 
   int lanes_available;
   int lane;
@@ -90,6 +90,6 @@ class Vehicle {
 
   void realize_prep_lane_change(map<int, vector<vector<int>>> predictions, string direction);
 
-  vector<vector<int>> generate_predictions(int horizon = 10);
+  vector<vector<int>> generate_predictions(int horizon = 5);
 };
 #endif /* VEHICLE_H */

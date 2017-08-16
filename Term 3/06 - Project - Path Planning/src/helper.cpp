@@ -128,3 +128,7 @@ int getLaneNumber(double d) {
 int getLaneFrenet(int lane, int offset) {
   return 2 + 4 * lane + offset;
 }
+
+int minmaxCarLaneNumber(int lane) {
+  return max(0, min(2, lane));
+}

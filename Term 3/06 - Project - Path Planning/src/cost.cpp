@@ -17,8 +17,7 @@ int Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, 
 
   cost += this->inefficiency_cost(vehicle, trajectories, predictions, trajectory_data);
   cost += this->collision_cost(vehicle, trajectories, predictions, trajectory_data);
-  // cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
-  // cout << "****************************" << endl;
+  cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
 
   return cost;
 }

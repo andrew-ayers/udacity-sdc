@@ -33,7 +33,6 @@ vector<double> PP::Solve(vector<double> car_data,
                          vector<double> previous_path_y,
                          vector<double> end_path_sd) {
   // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-
   this->car_x = car_data[0];
   this->car_y = car_data[1];
   this->car_s = car_data[2];
@@ -72,75 +71,12 @@ vector<double> PP::GeneratePath() {
   this->car_ref_vel = static_cast<double>(ego.v);
   this->car_lane = ego.lane;
 
-  cout << "Ego: ES = " << ego.s
-       << ", CS = " << this->car_s
+  cout << "Ego: S = " << ego.s
        << ", Lane = " << ego.lane
-       << ", State = " << ego.state
+       << ", Accel = " << ego.a
        << ", Velocity = " << ego.v
+       << ", State = " << ego.state
        << endl;
-
-
-  // return path;
-  //
-  // cout << "Ego: S = " << this->car_s
-  //      << ", Lane = " << this->car_lane
-  //      << ", State = " << ego.state << endl;
-
-  //if (this->car_ref_vel < 10) return path;
-
-  // if (ego.state == "LCL") {
-  //   // Lane change left
-  //   path = {};
-  // } else if (ego.state == "LCR") {
-  //   // Lane change right
-  //   path = {};
-  // } else {
-  //   // Keep lane (KL) or anything else
-  //   path = {};
-  // }
-  //
-  // double check_speed = 0;
-  // bool too_close = false;
-  //
-  // // find ref_v to use
-  // for (int i = 0; i < this->sensor_fusion.size(); i++) {
-  //   float d = this->sensor_fusion[i][6];  // what lane is the car in?
-  //
-  //   // is car is in my lane?
-  //   if (d < getLaneFrenet(this->car_lane, 2) && d > getLaneFrenet(this->car_lane, -2)) {
-  //     // get vector components of each car's velocity
-  //     double vx = this->sensor_fusion[i][3];  // x-component of car's velocity
-  //     double vy = this->sensor_fusion[i][4];  // y-component of car's velocity
-  //     // compute the magnitude of the velocity (distance formula)
-  //     check_speed = sqrt(vx * vx + vy * vy);
-  //     double check_car_s = this->sensor_fusion[i][5];
-  //
-  //     // check to see where the car will be "in the future"
-  //     // since we are using previous points, we need to project s-value out
-  //     check_car_s += static_cast<double>(this->previous_path_size * .02 * check_speed);
-  //     // check s-values greater than mine and s-gap
-  //     if ((check_car_s > this->car_s) && ((check_car_s - this->car_s) < 30)) {
-  //       // do some logic here; lower the reference velocity so we don't crash interpolate
-  //       // the car in front of us, could also flag to try to change lanes
-  //       too_close = true;
-  //
-  //       if (this->car_lane == 0 || this->car_lane == 2) {
-  //         this->car_lane = 1;
-  //       } else {
-  //         this->try_lane = this->car_lane = this->try_lane == 0 ? 2 : 0;
-  //       }
-  //
-  //       // cost function - what lane would be best to be in
-  //       // 5 seconds in future
-  //     }
-  //   }
-  // }
-  //
-  // if (too_close) {
-  //   this->car_ref_vel -= .224;  // 5 m/s^2
-  // } else if (this->car_ref_vel < this->car_max_vel) {
-  //   this->car_ref_vel += .224;
-  // }
 
   return this->GenerateKeepLane();
 }
@@ -214,11 +150,6 @@ vector<double> PP::GenerateKeepLane() {
   // translate and rotate all points to the car's
   // local coordinate system; set the origin of points
   // to 0,0 (translate) and the rotation to 0 degrees
-  // cout << "------" << endl;
-  // for (int i = 0; i < ptsx.size(); i++) {
-  //   cout << i << ") PTSX: " << ptsx[i] << ", PTSY: " << ptsy[i] << endl;
-  // }
-  // cout << "------" << endl;
   for (int i = 0; i < ptsx.size(); i++) {
     // shift car reference angle to 0 degrees
     double shift_x = ptsx[i] - ref_x;
@@ -227,10 +158,6 @@ vector<double> PP::GenerateKeepLane() {
     ptsx[i] = (shift_x * cos(0 - ref_yaw) - shift_y * sin(0 - ref_yaw));
     ptsy[i] = (shift_x * sin(0 - ref_yaw) + shift_y * cos(0 - ref_yaw));
   }
-
-  // for (int i = 0; i < ptsx.size(); i++) {
-  //   cout << i << ") PTSX: " << ptsx[i] << ", PTSY: " << ptsy[i] << endl;
-  // }
 
   // create a spline
   tk::spline s;

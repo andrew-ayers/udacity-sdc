@@ -19,9 +19,6 @@ class BP {
   // Lane in which ego starts in
   int EGO_START_LANE = 1;
 
-  // S-value the simulated car starts at
-  double EGO_START_S = 124.834;
-
  public:
   BP();
 

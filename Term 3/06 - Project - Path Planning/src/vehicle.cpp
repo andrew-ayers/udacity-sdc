@@ -7,6 +7,7 @@
 #include <algorithm>
 #include "snapshot.h"
 #include "cost.h"
+#include "helper.h"
 
 /**
  * Initializes Vehicle
@@ -80,14 +81,11 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
 
   vector<string> new_states;
   vector<int> new_costs;
-  string best = "KL";
 
   for (int i = 0; i < states.size(); i++) {
     string state = states[i];
 
-    // map<int, vector <vector<int>>> predictions_copy = predictions;
-
-    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions);
+    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 30);
 
     int cost = this->cost.calculate_cost(*this, trajectories, predictions);
 
@@ -95,7 +93,7 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
     new_costs.insert(new_costs.end(), cost);
   }
 
-  best = this->min_cost_state(states, new_costs);
+  string best = this->min_cost_state(states, new_costs);
 
   return best;
 }
@@ -105,6 +103,8 @@ string Vehicle::min_cost_state(vector<string> states, vector<int> costs) {
   int best_cost = 999999999;
 
   for (int i = 0; i < states.size(); i++) {
+    cout << "State: " << states[i] << ", Cost: " << costs[i] << endl;
+
     if (costs[i] < best_cost) {
       best_cost = costs[i];
       best_state = states[i];
@@ -114,8 +114,6 @@ string Vehicle::min_cost_state(vector<string> states, vector<int> costs) {
   return best_state;
 }
 
-// NOTE: Something is wrong with this method; it seems to reset the velocity
-// (and perhaps other attributes) of the ego car in some manner???
 vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<vector<int>>> predictions, int horizon) {
   // remember the current state of vehicle
   Snapshot current = Snapshot(this->lane, this->s, this->v, this->a, this->state);
@@ -126,7 +124,6 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
   // save the current state for the initial trajectory in the list
   trajectories.insert(trajectories.end(), current);
 
-  for (int i = 0; i < horizon; i++) {
     // restore the state from the snapshot...
     this->lane = current.lane;
     this->s = current.s;
@@ -138,8 +135,10 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
     // perform the pretended state transition
     this->realize_state(predictions);
 
-    // update the velocity and acceleration for the next time delta
-    this->increment();
+    for (int i = 0; i < horizon; i++) {
+      // update the velocity and acceleration for the next time delta
+      this->increment();
+    }
 
     // save the trajectory
     trajectories.insert(trajectories.end(), Snapshot(this->lane, this->s, this->v, this->a, this->state));
@@ -157,7 +156,7 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
 
       pr++;
     }
-  }
+  //}
 
   // restore the vehicle's state (from the snapshot)
   this->lane = current.lane;
@@ -200,6 +199,7 @@ void Vehicle::increment(int dt, bool skip_s) {
   double ddt = static_cast<double>(dt) * 0.02;
   if (!skip_s) this->s += this->v * ddt;
   this->v += this->a * ddt;
+  this->v = max(0.0, this->v);  // don't allow to go negative
 }
 
 vector<double> Vehicle::state_at(int t) {
@@ -208,7 +208,7 @@ vector<double> Vehicle::state_at(int t) {
   */
   double dt = static_cast<double>(t) * 0.02;
   double s = this->s + this->v * dt + this->a * dt * dt / 2;
-  double v = this->v + this->a * dt;
+  double v = max(0.0, this->v + this->a * dt);  // don't allow to go negative
   return {static_cast<double>(this->lane), s, v, this->a};
 }
 
@@ -268,13 +268,15 @@ void Vehicle::realize_keep_lane(map<int, vector<vector<int>>> predictions) {
 }
 
 void Vehicle::realize_lane_change(map<int, vector<vector<int>>> predictions, string direction) {
-  double delta = -1;
+  double delta = 1;
 
   if (direction.compare("L") == 0) {
-    delta = 1;
+    delta = -1;
   }
 
   this->lane += delta;
+
+  this->lane = minmaxCarLaneNumber(this->lane);
 
   this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
@@ -283,16 +285,6 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
   double delta_v_til_target = this->target_speed - this->v;
   double max_acc = min(this->max_acceleration, delta_v_til_target);
 
-  // cout << "DVTT: " << delta_v_til_target << ", MAX_ACC: " << max_acc << endl;
-
-  // NOTE: For some reason, this code which is supposed to be handling decceleration of the ego
-  // vehicle when it approaches the rear of another vehicle, it will sometimes cause the
-  // (acceleration? velocity? both?) to go negative or something, ultimately causing a segfault
-  // with the spline algorithm in the path planner...need to research (but it does seem to work
-  // otherwise). It may be that min-s is set too agressive? Or maybe negative acceleration should
-  // not be allowed to go too low? Maybe -5 to 11 instead of -11 to 11 as currently set?
-
-  #if 0
   map<int, vector<vector<int>>>::iterator it = predictions.begin();
   vector<vector<vector<int>>> in_front;
 
@@ -309,7 +301,7 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
   }
 
   if (in_front.size() > 0) {
-    int min_s = 1000;
+    int min_s = 200;
 
     vector<vector<int>> leading;
 
@@ -326,9 +318,8 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
     double available_room = separation_next - this->preferred_buffer;
 
     max_acc = min(max_acc, available_room);
+    max_acc = max(max_acc, -this->max_acceleration);
   }
-  // cout << "DVTT: " << delta_v_til_target << ", MAX_ACC: " << max_acc << endl;
-  #endif
 
   return max_acc;
 }
