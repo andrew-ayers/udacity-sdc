@@ -80,14 +80,14 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
   }
 
   vector<string> new_states;
-  vector<int> new_costs;
+  vector<double> new_costs;
 
   for (int i = 0; i < states.size(); i++) {
     string state = states[i];
 
-    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 30);
+    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 50);
 
-    int cost = this->cost.calculate_cost(*this, trajectories, predictions);
+    double cost = this->cost.calculate_cost(*this, trajectories, predictions);
 
     new_states.insert(new_states.end(), state);
     new_costs.insert(new_costs.end(), cost);
@@ -98,9 +98,9 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
   return best;
 }
 
-string Vehicle::min_cost_state(vector<string> states, vector<int> costs) {
+string Vehicle::min_cost_state(vector<string> states, vector<double> costs) {
   string best_state = "";
-  int best_cost = 999999999;
+  double best_cost = 999999999.0;
 
   for (int i = 0; i < states.size(); i++) {
     cout << "State: " << states[i] << ", Cost: " << costs[i] << endl;
@@ -125,10 +125,10 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
   trajectories.insert(trajectories.end(), current);
 
     // restore the state from the snapshot...
-    this->lane = current.lane;
-    this->s = current.s;
-    this->v = current.v;
-    this->a = current.a;
+    // this->lane = current.lane;
+    // this->s = current.s;
+    // this->v = current.v;
+    // this->a = current.a;
     // ...but pretend to be in the new proposed state
     this->state = state;
 
@@ -144,6 +144,7 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
     trajectories.insert(trajectories.end(), Snapshot(this->lane, this->s, this->v, this->a, this->state));
 
     // need to remove first prediction for each vehicle
+    /*
     map<int, vector <vector<int>>>::iterator pr = predictions.begin();
     while (pr != predictions.end()) {
       int prediction_id = pr->first;
@@ -156,6 +157,7 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
 
       pr++;
     }
+    */
   //}
 
   // restore the vehicle's state (from the snapshot)
@@ -200,6 +202,7 @@ void Vehicle::increment(int dt, bool skip_s) {
   if (!skip_s) this->s += this->v * ddt;
   this->v += this->a * ddt;
   this->v = max(0.0, this->v);  // don't allow to go negative
+  this->v = min(49.75, this->v); // don't allow to go over speed limit either
 }
 
 vector<double> Vehicle::state_at(int t) {
@@ -299,9 +302,9 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
 
     it++;
   }
-
+  /*
   if (in_front.size() > 0) {
-    int min_s = 200;
+    int min_s = 500;
 
     vector<vector<int>> leading;
 
@@ -319,7 +322,10 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
 
     max_acc = min(max_acc, available_room);
     max_acc = max(max_acc, -this->max_acceleration);
+
+    //cout << "MAX_ACC: " << max_acc << ", AVAIL_ROOM: " << available_room << endl;
   }
+  */
 
   return max_acc;
 }
@@ -366,23 +372,23 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions
 
     if (delta_v != 0) {
       double time = -2.0 * delta_s / delta_v;
-      double a;
+      double aa;
 
       if (time == 0) {
-        a = this->a;
+        aa = this->a;
       } else {
-        a = delta_v / time;
+        aa = delta_v / time;
       }
 
-      if (a > this->max_acceleration) {
-        a = this->max_acceleration;
+      if (aa > this->max_acceleration) {
+        aa = this->max_acceleration;
       }
 
-      if (a < -this->max_acceleration) {
-        a = -this->max_acceleration;
+      if (aa < -this->max_acceleration) {
+        aa = -this->max_acceleration;
       }
 
-      this->a = a;
+      this->a = aa;
     } else {
       double my_min_acc = max(-this->max_acceleration, -delta_s);
 

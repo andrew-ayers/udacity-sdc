@@ -62,7 +62,7 @@ class Vehicle {
 
   string get_next_state(map<int, vector <vector<int>>> predictions);
 
-  string min_cost_state(vector<string> states, vector<int> costs);
+  string min_cost_state(vector<string> states, vector<double> costs);
 
   vector<Snapshot> trajectories_for_state(string state, map<int, vector <vector<int>>> predictions, int horizon = 5);
 

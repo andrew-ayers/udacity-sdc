@@ -10,14 +10,14 @@
 Cost::Cost() {}
 Cost::~Cost() {}
 
-int Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector <vector<int>>> predictions) {
+double Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector <vector<int>>> predictions) {
   TrajectoryData trajectory_data = this->get_helper_data(vehicle, trajectories, predictions);
 
-  int cost = 0;
+  double cost = 0;
 
   cost += this->inefficiency_cost(vehicle, trajectories, predictions, trajectory_data);
-  cost += this->collision_cost(vehicle, trajectories, predictions, trajectory_data);
-  cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
+  //cost += this->collision_cost(vehicle, trajectories, predictions, trajectory_data);
+  //cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
 
   return cost;
 }
@@ -111,34 +111,34 @@ bool Cost::check_collision(Snapshot snapshot, double s_previous, double s_now) {
   return false;
 }
 
-int Cost::inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
+double Cost::inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
   double speed = data.avg_speed;
   double target_speed = vehicle.target_speed;
   double diff = target_speed - speed;
   double pct = diff / target_speed;
   double multiplier = pct * pct;
-  return static_cast<int>(multiplier) * EFFICIENCY;
+  return multiplier * EFFICIENCY;
 }
 
-int Cost::collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
+double Cost::collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
   if (data.collides) {
     double time_til_collision = data.collides_at;
     double exponent = time_til_collision * time_til_collision;
     double multiplier = exp(-exponent);
-    return static_cast<int>(multiplier) * COLLISION;
+    return multiplier * COLLISION;
   }
 
-  return 0;
+  return 0.0;
 }
 
-int Cost::buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
+double Cost::buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
   double closest = data.closest_approach;
   if (closest == 0) return 10 * DANGER;
 
   double timesteps_away = closest / data.avg_speed;
   if (timesteps_away > DESIRED_BUFFER) return 0;
 
-  double multiplier = 1 - pow((timesteps_away / static_cast<int>(DESIRED_BUFFER)), 2);
+  double multiplier = 1 - pow((timesteps_away / DESIRED_BUFFER), 2);
 
-  return static_cast<int>(multiplier) * DANGER;
+  return multiplier * DANGER;
 }

@@ -23,13 +23,13 @@ struct TrajectoryData {
 };
 
 // priority levels for costs
-const int COLLISION  = pow(10, 6);
-const int DANGER     = pow(10, 3);
-const int COMFORT    = pow(10, 2);
-const int EFFICIENCY = pow(10, 1);
+const double COLLISION  = pow(10.0, 4);
+const double DANGER     = pow(10.0, 3);
+const double COMFORT    = pow(10.0, 2);
+const double EFFICIENCY = pow(10.0, 1);
 
 const int PLANNING_HORIZON = 1;//20;
-const int DESIRED_BUFFER = 25;
+const double DESIRED_BUFFER = 25;
 
 class Vehicle;
 
@@ -45,7 +45,7 @@ class Cost {
    */
   virtual ~Cost();
 
-  int calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions);
+  double calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions);
 
   TrajectoryData get_helper_data(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions);
 
@@ -53,8 +53,8 @@ class Cost {
 
   bool check_collision(Snapshot snapshot, double s_previous, double s_now);
 
-  int inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);
-  int collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);
-  int buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);
+  double inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);
+  double collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);
+  double buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data);
 };
 #endif /* COST_H */
