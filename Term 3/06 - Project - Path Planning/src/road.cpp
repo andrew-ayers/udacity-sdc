@@ -21,10 +21,10 @@ void Road::populate_traffic(vector<vector<double>> sensor_fusion) {
   map<int, Vehicle>::iterator i = this->vehicles.begin();
   while (i != this->vehicles.end()) {
     int this_oah_id = i->first;
-    if (this_oah_id != this->ego_key) {
-      i = this->vehicles.erase(i);
+    if (this_oah_id == this->ego_key) {
+      i++; // skip
     } else {
-      i++;
+      i = this->vehicles.erase(i); // delete
     }
   }
 
@@ -45,7 +45,7 @@ void Road::populate_traffic(vector<vector<double>> sensor_fusion) {
     double oah_speed = sqrt(oah_vx * oah_vx + oah_vy * oah_vy);
 
     Vehicle vehicle = Vehicle(oah_lane, oah_s, oah_speed);
-    vehicle.state = "CS";
+    vehicle.state = "KL";  // CS?
     this->vehicles.insert(std::pair<int, Vehicle>(oah_id, vehicle));
   }
 }
@@ -56,8 +56,14 @@ void Road::advance(double ego_s) {
   map<int, Vehicle>::iterator it = this->vehicles.begin();
   while (it != this->vehicles.end()) {
       int v_id = it->first;
-      vector<vector<int>> preds = it->second.generate_predictions(30);  // originally = 5
-      predictions[v_id] = preds;
+
+      Vehicle vv = it->second;
+
+      // if the lane is < 0 then vehicle is not on track, so skip
+      if (vv.lane > -1) {
+        predictions[v_id] = vv.generate_predictions(100);
+      }
+
       it++;
   }
 

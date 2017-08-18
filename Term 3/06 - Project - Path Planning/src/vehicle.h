@@ -33,10 +33,11 @@ class Vehicle {
   };
 
   bool is_ego = false;
-  int preferred_buffer = 5;  // impacts "keep lane" behavior.
+  int preferred_buffer = 10;  // impacts "keep lane" behavior.
 
   int lanes_available;
   int lane;
+  int in_front = 0;
 
   double s;
   double v;

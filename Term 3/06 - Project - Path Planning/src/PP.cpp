@@ -70,11 +70,12 @@ vector<double> PP::GeneratePath() {
 
   this->car_ref_vel = static_cast<double>(ego.v);
   this->car_lane = ego.lane;
-
+  
   cout << "Ego: S = " << ego.s
        << ", Lane = " << ego.lane
        << ", Accel = " << ego.a
        << ", Velocity = " << ego.v
+       << ", In Front = " << ego.in_front
        << ", State = " << ego.state
        << endl;
 

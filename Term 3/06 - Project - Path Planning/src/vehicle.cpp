@@ -85,7 +85,7 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
   for (int i = 0; i < states.size(); i++) {
     string state = states[i];
 
-    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 50);
+    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 200);
 
     double cost = this->cost.calculate_cost(*this, trajectories, predictions);
 
@@ -103,7 +103,7 @@ string Vehicle::min_cost_state(vector<string> states, vector<double> costs) {
   double best_cost = 999999999.0;
 
   for (int i = 0; i < states.size(); i++) {
-    cout << "State: " << states[i] << ", Cost: " << costs[i] << endl;
+    //if (this->is_ego) cout << "State: " << states[i] << ", Cost: " << costs[i] << endl;
 
     if (costs[i] < best_cost) {
       best_cost = costs[i];
@@ -144,7 +144,6 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
     trajectories.insert(trajectories.end(), Snapshot(this->lane, this->s, this->v, this->a, this->state));
 
     // need to remove first prediction for each vehicle
-    /*
     map<int, vector <vector<int>>>::iterator pr = predictions.begin();
     while (pr != predictions.end()) {
       int prediction_id = pr->first;
@@ -157,7 +156,6 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
 
       pr++;
     }
-    */
   //}
 
   // restore the vehicle's state (from the snapshot)
@@ -284,7 +282,7 @@ void Vehicle::realize_lane_change(map<int, vector<vector<int>>> predictions, str
   this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
 
-double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, double s) {
+double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, double ss) {
   double delta_v_til_target = this->target_speed - this->v;
   double max_acc = min(this->max_acceleration, delta_v_til_target);
 
@@ -292,48 +290,47 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
   vector<vector<vector<int>>> in_front;
 
   while (it != predictions.end()) {
-    int v_id = it->first;
+    int vv_id = it->first;
 
-    vector<vector<int>> v = it->second;
+    vector<vector<int>> vv = it->second;
 
-    if ((v[0][0] == lane) && (v[0][1] > s)) {
-      in_front.push_back(v);
+    if ((vv[0][0] == lane) && (vv[0][1] > ss)) {
+      in_front.push_back(vv);
     }
 
     it++;
   }
-  /*
-  if (in_front.size() > 0) {
-    int min_s = 500;
+
+  this->in_front = in_front.size();
+
+  if (this->in_front > 0) {
+    double min_s = 200.0;
 
     vector<vector<int>> leading;
 
     for (int i = 0; i < in_front.size(); i++) {
-      if ((in_front[i][0][1] - s) < min_s) {
-        min_s = (in_front[i][0][1] - s);
+      if ((in_front[i][0][1] - ss) < min_s) {
+        min_s = (in_front[i][0][1] - ss);
         leading = in_front[i];
       }
     }
 
     double next_pos = leading.size() > 1 ? leading[1][1] : min_s;
-    double my_next = s + this->v;
+    double my_next = ss + this->v;
     double separation_next = next_pos - my_next;
     double available_room = separation_next - this->preferred_buffer;
 
     max_acc = min(max_acc, available_room);
-    max_acc = max(max_acc, -this->max_acceleration);
-
-    //cout << "MAX_ACC: " << max_acc << ", AVAIL_ROOM: " << available_room << endl;
+    max_acc = max(max_acc, -1.0 * this->max_acceleration);
   }
-  */
 
   return max_acc;
 }
 
 void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions, string direction) {
-  int delta = -1;
+  int delta = 1;
   if (direction.compare("L") == 0) {
-    delta = 1;
+    delta = -1;
   }
 
   int lane = this->lane + delta;
@@ -395,6 +392,8 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions
       this->a = my_min_acc;
     }
   }
+
+  this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
 
 vector<vector<int>> Vehicle::generate_predictions(int horizon) {
