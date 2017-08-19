@@ -61,7 +61,7 @@ void Road::advance(double ego_s) {
 
       // if the lane is < 0 then vehicle is not on track, so skip
       if (vv.lane > -1) {
-        predictions[v_id] = vv.generate_predictions(100);
+        predictions[v_id] = vv.generate_predictions(125);
       }
 
       it++;
@@ -73,10 +73,14 @@ void Road::advance(double ego_s) {
 
     bool is_ego = (v_id == ego_key);
 
-    if (is_ego) {
-      it->second.s = ego_s;  // sync up ego s-value to simulator s-value
-      it->second.update_state(predictions);
-      it->second.realize_state(predictions);
+    ticks++;
+    if (ticks > max_ticks) {
+      ticks = 0;
+      if (is_ego) {
+        it->second.s = ego_s;  // sync up ego s-value to simulator s-value
+        it->second.update_state(predictions);
+        it->second.realize_state(predictions);
+      }
     }
 
     // NOTE: if we are updating the ego car, don't calculate s-value, keep set value

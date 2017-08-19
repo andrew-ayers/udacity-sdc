@@ -21,10 +21,6 @@ BP::~BP() {}
 void BP::advance(vector<vector<double>> sensor_fusion, double ego_s) {
   this->road.populate_traffic(sensor_fusion);
 
-  if (ticks++ < max_ticks) return;
-
-  ticks = 0;
-
   this->road.advance(ego_s);  // pass in simulator reported s-value to sync up ego s-value
 }
 

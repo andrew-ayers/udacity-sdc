@@ -12,8 +12,6 @@ class BP {
  private:
   Road road;
 
-  int ticks = 0;
-  int max_ticks = 0;
   // At each timestep, ego can set acceleration to value between
   // -MAX_ACCEL and MAX_ACCEL
   int EGO_MAX_ACCEL = 11;  // 11 * .02 = .22, close to the 0.224 value from walkthru

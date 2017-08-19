@@ -17,6 +17,9 @@ using namespace std;
 
 class Road {
  public:
+  int ticks = 40;
+  int max_ticks = 40;
+
   int ego_key = -1;
 
   int num_lanes = 3;

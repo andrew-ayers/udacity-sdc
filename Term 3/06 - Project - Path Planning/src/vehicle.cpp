@@ -35,7 +35,7 @@ void Vehicle::update(int lane, double s, double v, double a) {
 // TODO - Implement this method.
 void Vehicle::update_state(map<int, vector <vector<int>>> predictions) {
   /*
-    Updates the "state" of the vehicle by assigning one of the
+    Updates the "state" of the ego vehicle by assigning one of the
     following values to 'self.state':
 
     "KL" - Keep Lane
@@ -74,9 +74,11 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
   vector<string> states = {"KL", "PLCR", "LCR", "PLCL", "LCL"};
 
   if (this->lane == 0) {
-    states.erase(states.begin() + 3, states.begin() + 4);
+    states.erase(states.begin() + 4);
+    states.erase(states.begin() + 3);
   } else if (this->lane == this->lanes_available - 1) {
-    states.erase(states.begin() + 1, states.begin() + 2);
+    states.erase(states.begin() + 2);
+    states.erase(states.begin() + 1);
   }
 
   vector<string> new_states;
@@ -85,7 +87,7 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
   for (int i = 0; i < states.size(); i++) {
     string state = states[i];
 
-    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 200);
+    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 125); // 2.5 second horizon (125 * 0.02)
 
     double cost = this->cost.calculate_cost(*this, trajectories, predictions);
 
@@ -93,7 +95,7 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
     new_costs.insert(new_costs.end(), cost);
   }
 
-  string best = this->min_cost_state(states, new_costs);
+  string best = this->min_cost_state(new_states, new_costs);
 
   return best;
 }
@@ -103,7 +105,7 @@ string Vehicle::min_cost_state(vector<string> states, vector<double> costs) {
   double best_cost = 999999999.0;
 
   for (int i = 0; i < states.size(); i++) {
-    //if (this->is_ego) cout << "State: " << states[i] << ", Cost: " << costs[i] << endl;
+    cout << "State: " << states[i] << ", Cost: " << costs[i] << endl;
 
     if (costs[i] < best_cost) {
       best_cost = costs[i];
@@ -115,7 +117,7 @@ string Vehicle::min_cost_state(vector<string> states, vector<double> costs) {
 }
 
 vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<vector<int>>> predictions, int horizon) {
-  // remember the current state of vehicle
+  // remember the current state of ego vehicle
   Snapshot current = Snapshot(this->lane, this->s, this->v, this->a, this->state);
 
   // build a list of trajectories
@@ -136,7 +138,7 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
     this->realize_state(predictions);
 
     for (int i = 0; i < horizon; i++) {
-      // update the velocity and acceleration for the next time delta
+      // update the velocity and acceleration of ego for the next time delta
       this->increment();
     }
 
@@ -158,7 +160,7 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
     }
   //}
 
-  // restore the vehicle's state (from the snapshot)
+  // restore the ego vehicle's state from the snapshot
   this->lane = current.lane;
   this->s = current.s;
   this->v = current.v;
@@ -199,8 +201,10 @@ void Vehicle::increment(int dt, bool skip_s) {
   double ddt = static_cast<double>(dt) * 0.02;
   if (!skip_s) this->s += this->v * ddt;
   this->v += this->a * ddt;
-  this->v = max(0.0, this->v);  // don't allow to go negative
-  this->v = min(49.75, this->v); // don't allow to go over speed limit either
+  if (this->is_ego) {
+    this->v = max(0.0, this->v);  // don't allow ego velocity to go negative
+    this->v = min(49.75, this->v); // ...or go over the speed limit either
+  }
 }
 
 vector<double> Vehicle::state_at(int t) {
@@ -209,7 +213,8 @@ vector<double> Vehicle::state_at(int t) {
   */
   double dt = static_cast<double>(t) * 0.02;
   double s = this->s + this->v * dt + this->a * dt * dt / 2;
-  double v = max(0.0, this->v + this->a * dt);  // don't allow to go negative
+  double v = this->v + this->a * dt;
+  if (this->is_ego) v = max(0.0, v); // don't allow the ego's velocity to go negative
   return {static_cast<double>(this->lane), s, v, this->a};
 }
 
@@ -304,7 +309,7 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
   this->in_front = in_front.size();
 
   if (this->in_front > 0) {
-    double min_s = 200.0;
+    double min_s = 500.0;
 
     vector<vector<int>> leading;
 
@@ -329,6 +334,7 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
 
 void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions, string direction) {
   int delta = 1;
+
   if (direction.compare("L") == 0) {
     delta = -1;
   }
