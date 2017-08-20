@@ -5,6 +5,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "spline.h"
+#include "config.h"
 #include "helper.h"
 #include "BP.h"
 
@@ -68,16 +69,20 @@ vector<double> PP::GeneratePath() {
   // ego.target_speed;
   // ego.state;
 
-  this->car_ref_vel = static_cast<double>(ego.v);
   this->car_lane = ego.lane;
-  
-  cout << "Ego: S = " << ego.s
-       << ", Lane = " << ego.lane
-       << ", Accel = " << ego.a
-       << ", Velocity = " << ego.v
-       << ", In Front = " << ego.in_front
-       << ", State = " << ego.state
-       << endl;
+
+  this->car_ref_vel = static_cast<double>(ego.v);
+
+  if (DEBUG) {
+    cout << "Ego: S = " << ego.s
+         << ", Lane = " << ego.lane
+         << ", Accel = " << ego.a
+         << ", Velocity = " << ego.v
+         << ", In Front = " << ego.in_front
+         << ", At Behind = " << ego.at_behind
+         << ", State = " << ego.state
+         << endl;
+  }
 
   return this->GenerateKeepLane();
 }
@@ -131,11 +136,11 @@ vector<double> PP::GenerateKeepLane() {
     ptsy.push_back(ref_y);
   }
 
-  // use frenet to evenly add 30m spaced points ahead of starting reference
+  // use frenet to evenly add 30m spaced points (30m, 60m, 90m) ahead of starting reference
   int lane = getLaneFrenet(this->car_lane, 0);
-  vector<double> next_wp0 = getXY(this->car_s + 30, lane, this->map_waypoints_s, this->map_waypoints_x, this->map_waypoints_y);
-  vector<double> next_wp1 = getXY(this->car_s + 60, lane, this->map_waypoints_s, this->map_waypoints_x, this->map_waypoints_y);
-  vector<double> next_wp2 = getXY(this->car_s + 90, lane, this->map_waypoints_s, this->map_waypoints_x, this->map_waypoints_y);
+  vector<double> next_wp0 = getXY(this->car_s + SPLINE_SPACING, lane, this->map_waypoints_s, this->map_waypoints_x, this->map_waypoints_y);
+  vector<double> next_wp1 = getXY(this->car_s + (SPLINE_SPACING * 2), lane, this->map_waypoints_s, this->map_waypoints_x, this->map_waypoints_y);
+  vector<double> next_wp2 = getXY(this->car_s + (SPLINE_SPACING * 3), lane, this->map_waypoints_s, this->map_waypoints_x, this->map_waypoints_y);
 
   ptsx.push_back(next_wp0[0]);
   ptsx.push_back(next_wp1[0]);
@@ -175,7 +180,7 @@ vector<double> PP::GenerateKeepLane() {
 
   // calculate how to break up the spline points so that we travel
   // at our desired reference velocity
-  double target_x = 30.0;  // horizon
+  double target_x = SPLINE_SPACING;  // horizon 30 meters, 0.6s (30 * 0.02)
   double target_y = s(target_x);
   double target_dist = sqrt((target_x * target_x) + (target_y * target_y));
 
@@ -183,9 +188,10 @@ vector<double> PP::GenerateKeepLane() {
 
   // fill up the rest of our path plan after filling it with
   // the previous points, here we will always output 50 points
+  // (1 meter distance between points)
   // Note: 2.24 is our conversion factor, 1 m/s = 2.24 mph
-  for (int i = 1; i <= 50 - this->previous_path_size; i++) {
-    double N = (target_dist / (.02 * this->car_ref_vel / 2.24));
+  for (int i = 1; i <= FILLER_DIST - this->previous_path_size; i++) {
+    double N = (target_dist / (SECS_PER_TICK * this->car_ref_vel / MPH_TO_MPS));
     double x_point = x_add_on + (target_x) / N;
     double y_point = s(x_point);
 

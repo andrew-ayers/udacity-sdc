@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <string>
+#include "config.h"
 #include "road.h"
 
 //
@@ -11,9 +12,7 @@
 BP::BP() {
   this->road = Road();
 
-  vector<double> ego_config = {this->road.speed_limit, static_cast<double>(this->road.num_lanes), static_cast<double>(this->EGO_MAX_ACCEL)};
-
-  this->road.add_ego(this->EGO_START_LANE, 0, ego_config);
+  this->road.add_ego(EGO_START_LANE, 0);
 }
 
 BP::~BP() {}

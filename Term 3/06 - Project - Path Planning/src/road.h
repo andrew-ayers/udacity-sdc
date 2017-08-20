@@ -11,24 +11,20 @@
 #include <map>
 #include <string>
 #include <iterator>
+#include "config.h"
 #include "vehicle.h"
 
 using namespace std;
 
 class Road {
  public:
-  int ticks = 40;
-  int max_ticks = 40;
-
-  int ego_key = -1;
-
-  int num_lanes = 3;
-
-  double speed_limit = 49.75;  // max speed for ego vehicle
+  // "prime the pump" so that first tick will run
+  // the behavior planner for ego
+  int ticks = MAX_TICKS;
 
   map<int, Vehicle> vehicles;
 
-  int vehicles_added = 0;
+  int ego_key = -1;  // identifier for ego vehicle in vehicles map
 
   /**
    * Constructor
@@ -46,6 +42,6 @@ class Road {
 
   void advance(double ego_s = 0);
 
-  void add_ego(int lane_num, double s, vector<double> config_data);
+  void add_ego(int lane_num, double s);
 };
 #endif /* ROAD_H */

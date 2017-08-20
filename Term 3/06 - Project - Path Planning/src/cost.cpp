@@ -4,13 +4,14 @@
 #include <map>
 #include <string>
 #include <iterator>
+#include "config.h"
 #include "vehicle.h"
 #include "snapshot.h"
 
 Cost::Cost() {}
 Cost::~Cost() {}
 
-double Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector <vector<int>>> predictions) {
+double Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectories, map<int, vector<vector<double>>> predictions) {
   TrajectoryData trajectory_data = this->get_helper_data(vehicle, trajectories, predictions);
 
   double cost = 0;
@@ -22,7 +23,7 @@ double Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectorie
   return cost;
 }
 
-TrajectoryData Cost::get_helper_data(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector <vector<int>>> predictions) {
+TrajectoryData Cost::get_helper_data(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<double>>> predictions) {
   TrajectoryData trajectory_data;
 
   vector<Snapshot> t = trajectories;
@@ -43,33 +44,32 @@ TrajectoryData Cost::get_helper_data(Vehicle vehicle, vector<Snapshot> trajector
   double closest_approach = 9999999.0;
   bool collides = false;
 
-  map<int, vector<vector<int>>> filtered = this->filter_predictions_by_lane(predictions, trajectory_data.proposed_lane);
+  map<int, vector<vector<double>>> filtered = this->filter_predictions_by_lane(predictions, trajectory_data.proposed_lane);
 
-  for (int i = 1; i < (PLANNING_HORIZON + 1); i++) {
-    Snapshot snapshot = trajectories[i];
+  // get trajectory for future state of ego vehicle
+  Snapshot snapshot = trajectories[1];
 
-    accels.insert(accels.end(), snapshot.a);
+  accels.insert(accels.end(), snapshot.a);
 
-    map<int, vector<vector<int>>>::iterator it = filtered.begin();
+  map<int, vector<vector<double>>>::iterator it = filtered.begin();
 
-    while (it != filtered.end()) {
-      int v_id = it->first;
+  while (it != filtered.end()) {
+    int v_id = it->first;
 
-      vector<vector<int>> v = it->second;
-      vector<int> state = v[i];
-      vector<int> last_state = v[i - 1];
+    vector<vector<double>> v = it->second;
+    vector<double> curr_state = v[1];
+    vector<double> prev_state = v[0];
 
-      bool vehicle_collides = this->check_collision(snapshot, last_state[1], state[1]);
-      if (vehicle_collides) {
-        trajectory_data.collides = true;
-        trajectory_data.collides_at = static_cast<double>(i);
-      }
-
-      int dist = abs(state[1] - snapshot.s);
-      if (dist < trajectory_data.closest_approach) trajectory_data.closest_approach = dist;
-
-      it++;
+    bool vehicle_collides = this->check_collision(snapshot, prev_state[1], curr_state[1]);
+    if (vehicle_collides) {
+      trajectory_data.collides = true;
+      trajectory_data.collides_at = curr_state[1];
     }
+
+    int dist = abs(curr_state[1] - snapshot.s);
+    if (dist < trajectory_data.closest_approach) trajectory_data.closest_approach = dist;
+
+    it++;
   }
 
   // find max acceleration value
@@ -82,16 +82,16 @@ TrajectoryData Cost::get_helper_data(Vehicle vehicle, vector<Snapshot> trajector
   return trajectory_data;
 }
 
-map<int, vector<vector<int>>> Cost::filter_predictions_by_lane(map<int, vector <vector<int>>> predictions, int lane) {
-  map<int, vector<vector<int>>> filtered;
+map<int, vector<vector<double>>> Cost::filter_predictions_by_lane(map<int, vector <vector<double>>> predictions, int lane) {
+  map<int, vector<vector<double>>> filtered;
 
-  map<int, vector<vector<int>>>::iterator it = predictions.begin();
+  map<int, vector<vector<double>>>::iterator it = predictions.begin();
 
   while (it != predictions.end()) {
     int v_id = it->first;
-    vector<vector<int>> predicted_traj = it->second;
+    vector<vector<double>> predicted_traj = it->second;
 
-    if (predicted_traj[0][0] == lane && v_id != -1) {
+    if (static_cast<int>(predicted_traj[0][0]) == lane && v_id != -1) {
       filtered[v_id] = predicted_traj;
     }
 
@@ -101,17 +101,17 @@ map<int, vector<vector<int>>> Cost::filter_predictions_by_lane(map<int, vector <
   return filtered;
 }
 
-bool Cost::check_collision(Snapshot snapshot, double s_previous, double s_now) {
-  double v_target = s_now - s_previous;
+bool Cost::check_collision(Snapshot snapshot, double s_prev, double s_curr) {
+  double v_target = s_curr - s_prev;
 
-  if (s_previous < snapshot.s) return (s_now >= snapshot.s);
-  if (s_previous > snapshot.s) return (s_now <= snapshot.s);
-  if (s_previous == snapshot.s) return (v_target <= snapshot.v);
+  if (s_prev < snapshot.s) return (s_curr >= snapshot.s);
+  if (s_prev > snapshot.s) return (s_curr <= snapshot.s);
+  if (s_prev == snapshot.s) return (v_target <= snapshot.v);
 
-  return false;
+  return true;
 }
 
-double Cost::inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
+double Cost::inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<double>>> predictions, TrajectoryData data) {
   double speed = data.avg_speed;
   double target_speed = vehicle.target_speed;
   double diff = target_speed - speed;
@@ -120,7 +120,7 @@ double Cost::inefficiency_cost(Vehicle vehicle, vector<Snapshot> trajectories, m
   return multiplier * EFFICIENCY;
 }
 
-double Cost::collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
+double Cost::collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<double>>> predictions, TrajectoryData data) {
   if (data.collides) {
     double time_til_collision = data.collides_at;
     double exponent = time_til_collision * time_til_collision;
@@ -131,7 +131,7 @@ double Cost::collision_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<
   return 0.0;
 }
 
-double Cost::buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<int>>> predictions, TrajectoryData data) {
+double Cost::buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int, vector<vector<double>>> predictions, TrajectoryData data) {
   double closest = data.closest_approach;
   if (closest == 0) return 10 * DANGER;
 

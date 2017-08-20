@@ -32,12 +32,11 @@ class Vehicle {
     string state;
   };
 
-  bool is_ego = false;
-  int preferred_buffer = 10;  // impacts "keep lane" behavior.
-
   int lanes_available;
   int lane;
-  int in_front = 0;
+  int in_front;  // number of vehicles "in front" of ego vehicle
+  int at_behind; // number of vehicles "behind" ego vehicle
+  bool is_ego;
 
   double s;
   double v;
@@ -50,7 +49,7 @@ class Vehicle {
   /**
    * Constructor
    */
-  Vehicle(int lane, double s, double v, double a = 0);
+  Vehicle(int lane, double s, double v, double a = 0, bool is_ego = false);
 
   /**
    * Destructor
@@ -59,38 +58,36 @@ class Vehicle {
 
   void update(int lane, double s, double v, double a);
 
-  void update_state(map<int, vector <vector<int>>> predictions);
+  void update_state(map<int, vector <vector<double>>> predictions);
 
-  string get_next_state(map<int, vector <vector<int>>> predictions);
+  string get_next_state(map<int, vector <vector<double>>> predictions);
 
   string min_cost_state(vector<string> states, vector<double> costs);
 
-  vector<Snapshot> trajectories_for_state(string state, map<int, vector <vector<int>>> predictions, int horizon = 5);
-
-  void configure(vector<double> road_data);
+  vector<Snapshot> trajectories_for_state(string state, map<int, vector <vector<double>>> predictions, int horizon = 5);
 
   string display();
 
-  void increment(int dt = 1, bool skip_s = false);
+  void increment(double dt = 1.0);
 
-  vector<double> state_at(int t);
+  vector<double> state_at(double t);
 
-  bool collides_with(Vehicle other, int at_time);
+  bool collides_with(Vehicle other, double at_time);
 
   collider will_collide_with(Vehicle other, int timesteps);
 
-  void realize_state(map<int, vector<vector<int>>> predictions);
+  void realize_state(map<int, vector<vector<double>>> predictions);
 
   void realize_constant_speed();
 
-  double _max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, double s);
+  double _max_accel_for_lane(map<int, vector<vector<double>>> predictions, int lane, double s);
 
-  void realize_keep_lane(map<int, vector< vector<int>>> predictions);
+  void realize_keep_lane(map<int, vector<vector<double>>> predictions);
 
-  void realize_lane_change(map<int, vector<vector<int>>> predictions, string direction);
+  void realize_lane_change(map<int, vector<vector<double>>> predictions, string direction);
 
-  void realize_prep_lane_change(map<int, vector<vector<int>>> predictions, string direction);
+  void realize_prep_lane_change(map<int, vector<vector<double>>> predictions, string direction);
 
-  vector<vector<int>> generate_predictions(int horizon = 5);
+  vector<vector<double>> generate_predictions(int horizon = 5);
 };
 #endif /* VEHICLE_H */

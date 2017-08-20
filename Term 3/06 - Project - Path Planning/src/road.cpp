@@ -6,6 +6,7 @@
 #include <string>
 #include <iterator>
 #include <utility>
+#include "config.h"
 #include "vehicle.h"
 #include "helper.h"
 
@@ -22,9 +23,9 @@ void Road::populate_traffic(vector<vector<double>> sensor_fusion) {
   while (i != this->vehicles.end()) {
     int this_oah_id = i->first;
     if (this_oah_id == this->ego_key) {
-      i++; // skip
+      i++;  // skip ego
     } else {
-      i = this->vehicles.erase(i); // delete
+      i = this->vehicles.erase(i);  // delete npc vehicle
     }
   }
 
@@ -51,7 +52,7 @@ void Road::populate_traffic(vector<vector<double>> sensor_fusion) {
 }
 
 void Road::advance(double ego_s) {
-  map<int, vector<vector<int>>> predictions;
+  map<int, vector<vector<double>>> predictions;
 
   map<int, Vehicle>::iterator it = this->vehicles.begin();
   while (it != this->vehicles.end()) {
@@ -61,7 +62,7 @@ void Road::advance(double ego_s) {
 
       // if the lane is < 0 then vehicle is not on track, so skip
       if (vv.lane > -1) {
-        predictions[v_id] = vv.generate_predictions(125);
+        predictions[v_id] = vv.generate_predictions(PREDICTIONS_HZ);
       }
 
       it++;
@@ -74,7 +75,7 @@ void Road::advance(double ego_s) {
     bool is_ego = (v_id == ego_key);
 
     ticks++;
-    if (ticks > max_ticks) {
+    if (ticks > MAX_TICKS) {
       ticks = 0;
       if (is_ego) {
         it->second.s = ego_s;  // sync up ego s-value to simulator s-value
@@ -83,20 +84,14 @@ void Road::advance(double ego_s) {
       }
     }
 
-    // NOTE: if we are updating the ego car, don't calculate s-value, keep set value
-    it->second.increment(1, is_ego);  // default dt = 0.02s
+    it->second.increment();
 
     it++;
   }
 }
 
-void Road::add_ego(int lane_num, double s, vector<double> config_data) {
-  Vehicle ego = Vehicle(lane_num, s, 0, 0);
+void Road::add_ego(int lane_num, double s) {
+  Vehicle ego = Vehicle(lane_num, s, 0, 0, true);
 
-  ego.configure(config_data);
-
-  ego.state = "KL";
-  ego.is_ego = true;
-
-  this->vehicles.insert(std::pair<int, Vehicle>(ego_key, ego));
+  this->vehicles.insert(std::pair<int, Vehicle>(this->ego_key, ego));
 }

@@ -19,6 +19,8 @@ class PP {
   vector<double> map_waypoints_dx;
   vector<double> map_waypoints_dy;
 
+  int car_lane;
+
   double car_x;
   double car_y;
   double car_s;
@@ -26,11 +28,7 @@ class PP {
   double car_yaw;
   double car_speed;
 
-  int car_lane = 1;
-  int try_lane = 0;
-
-  double car_ref_vel = 0.1;
-  double car_max_vel = 49.75;
+  double car_ref_vel = 0.0;
 
   vector<vector<double>> sensor_fusion;
   vector<double> previous_path_x;

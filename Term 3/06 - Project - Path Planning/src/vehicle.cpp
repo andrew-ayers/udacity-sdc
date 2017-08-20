@@ -5,6 +5,7 @@
 #include <string>
 #include <iterator>
 #include <algorithm>
+#include "config.h"
 #include "snapshot.h"
 #include "cost.h"
 #include "helper.h"
@@ -12,13 +13,22 @@
 /**
  * Initializes Vehicle
  */
-Vehicle::Vehicle(int lane, double s, double v, double a) {
+Vehicle::Vehicle(int lane, double s, double v, double a, bool is_ego) {
     this->lane = lane;
     this->s = s;
     this->v = v;
     this->a = a;
     this->state = "CS";
-    this->max_acceleration = -1;
+
+    if (is_ego) {
+      // configure speed limit, num_lanes, max_acceleration, is_ego for ego vehicle
+      this->target_speed = EGO_MAX_VELOCITY;
+      this->lanes_available = NUM_LANES;
+      this->max_acceleration = EGO_MAX_ACCEL;
+      this->is_ego = true;
+    } else {
+      this->max_acceleration = 0;
+    }
 
     this->cost = Cost();
 }
@@ -33,7 +43,7 @@ void Vehicle::update(int lane, double s, double v, double a) {
 }
 
 // TODO - Implement this method.
-void Vehicle::update_state(map<int, vector <vector<int>>> predictions) {
+void Vehicle::update_state(map<int, vector <vector<double>>> predictions) {
   /*
     Updates the "state" of the ego vehicle by assigning one of the
     following values to 'self.state':
@@ -70,13 +80,23 @@ void Vehicle::update_state(map<int, vector <vector<int>>> predictions) {
     this->state = this->get_next_state(predictions);
 }
 
-string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
+string Vehicle::get_next_state(map<int, vector <vector<double>>> predictions) {
   vector<string> states = {"KL", "PLCR", "LCR", "PLCL", "LCL"};
 
-  if (this->lane == 0) {
+  // remove states that are impossible to get to from the current state
+  string state = this->state;
+
+  if (this->lane == 0) {  // left-hand lane
     states.erase(states.begin() + 4);
     states.erase(states.begin() + 3);
-  } else if (this->lane == this->lanes_available - 1) {
+    if (state.compare("KL") == 0) states.erase(states.begin() + 2);  // if in KL state, only allow transition to PLCR, not LCR
+  } else if (this->lane == 1) {  // middle lane
+    if (state.compare("KL") == 0) {
+      states.erase(states.begin() + 4);  // if in KL state, only allow transition
+      states.erase(states.begin() + 2);  // to PLCR or PLCL, not LCR or LCL
+    }
+  } else if (this->lane == this->lanes_available - 1) {  // right-hand lane
+    if (state.compare("KL") == 0) states.erase(states.begin() + 4);  // if in KL state, only allow transition to PLCR, not LCR
     states.erase(states.begin() + 2);
     states.erase(states.begin() + 1);
   }
@@ -87,7 +107,8 @@ string Vehicle::get_next_state(map<int, vector <vector<int>>> predictions) {
   for (int i = 0; i < states.size(); i++) {
     string state = states[i];
 
-    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, 125); // 2.5 second horizon (125 * 0.02)
+    // two trajectories - the current trajectory, and the proposed state trajectory
+    vector<Snapshot> trajectories = this->trajectories_for_state(state, predictions, TRAJECTORIES_HZ);
 
     double cost = this->cost.calculate_cost(*this, trajectories, predictions);
 
@@ -104,19 +125,26 @@ string Vehicle::min_cost_state(vector<string> states, vector<double> costs) {
   string best_state = "";
   double best_cost = 999999999.0;
 
-  for (int i = 0; i < states.size(); i++) {
-    cout << "State: " << states[i] << ", Cost: " << costs[i] << endl;
+  if (DEBUG) cout << endl << "State Costs: ";
 
+  for (int i = 0; i < states.size(); i++) {
+    if (DEBUG) {
+      if (i > 0) cout << ", ";
+      cout << states[i] << ": " << costs[i];
+    }
+    
     if (costs[i] < best_cost) {
       best_cost = costs[i];
       best_state = states[i];
     }
   }
 
+  if (DEBUG) cout << endl << endl;
+
   return best_state;
 }
 
-vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<vector<int>>> predictions, int horizon) {
+vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<vector<double>>> predictions, int horizon) {
   // remember the current state of ego vehicle
   Snapshot current = Snapshot(this->lane, this->s, this->v, this->a, this->state);
 
@@ -126,39 +154,33 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
   // save the current state for the initial trajectory in the list
   trajectories.insert(trajectories.end(), current);
 
-    // restore the state from the snapshot...
-    // this->lane = current.lane;
-    // this->s = current.s;
-    // this->v = current.v;
-    // this->a = current.a;
-    // ...but pretend to be in the new proposed state
-    this->state = state;
+  // ...pretend to be in the new proposed state
+  this->state = state;
 
-    // perform the pretended state transition
-    this->realize_state(predictions);
+  // perform the state transition for the proposed state
+  this->realize_state(predictions);
 
-    for (int i = 0; i < horizon; i++) {
-      // update the velocity and acceleration of ego for the next time delta
-      this->increment();
-    }
+  for (int i = 0; i < horizon; i++) {
+    // update the velocity and acceleration of ego out to the horizon
+    this->increment();
+  }
 
-    // save the trajectory
-    trajectories.insert(trajectories.end(), Snapshot(this->lane, this->s, this->v, this->a, this->state));
+  // save the trajectory results of the proposed state
+  trajectories.insert(trajectories.end(), Snapshot(this->lane, this->s, this->v, this->a, this->state));
 
-    // need to remove first prediction for each vehicle
-    map<int, vector <vector<int>>>::iterator pr = predictions.begin();
-    while (pr != predictions.end()) {
-      int prediction_id = pr->first;
+  // need to remove first prediction for each vehicle
+  map<int, vector <vector<double>>>::iterator pr = predictions.begin();
+  while (pr != predictions.end()) {
+    int prediction_id = pr->first;
 
-      vector<vector<int>> prediction = pr->second;
+    vector<vector<double>> prediction = pr->second;
 
-      prediction.erase(prediction.begin());
+    prediction.erase(prediction.begin());
 
-      predictions[prediction_id] = prediction;
+    predictions[prediction_id] = prediction;
 
-      pr++;
-    }
-  //}
+    pr++;
+  }
 
   // restore the ego vehicle's state from the snapshot
   this->lane = current.lane;
@@ -168,18 +190,6 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
   this->state = current.state;
 
   return trajectories;
-}
-
-void Vehicle::configure(vector<double> road_data) {
-  /*
-   Called by simulator before simulation begins. Sets various
-   parameters which will impact the ego vehicle.
-  */
-
-  // configuration data: speed limit, num_lanes, max_acceleration
-  this->target_speed = road_data[0];
-  this->lanes_available = static_cast<int>(road_data[1]);
-  this->max_acceleration = road_data[2];
 }
 
 string Vehicle::display() {
@@ -197,33 +207,39 @@ string Vehicle::display() {
 // are "fer-realz" incrementing; otherwise calculated
 // s-value gets out of sync quickly with the actual
 // s-value from the simulator
-void Vehicle::increment(int dt, bool skip_s) {
-  double ddt = static_cast<double>(dt) * 0.02;
-  if (!skip_s) this->s += this->v * ddt;
+void Vehicle::increment(double dt) {
+  double ddt = dt * SECS_PER_TICK;
+
+  // NOTE: if we are updating the ego car, don't calculate the
+  // s-value, keep the currently set value and don't vary it
+  if (this->is_ego) this->s += this->v * ddt;
+
   this->v += this->a * ddt;
+
   if (this->is_ego) {
     this->v = max(0.0, this->v);  // don't allow ego velocity to go negative
-    this->v = min(49.75, this->v); // ...or go over the speed limit either
+    this->v = min(EGO_MAX_VELOCITY, this->v);  // ...or go over the speed limit either
   }
 }
 
-vector<double> Vehicle::state_at(int t) {
+vector<double> Vehicle::state_at(double t) {
   /*
     Predicts state of vehicle in t*0.02 seconds (assuming constant acceleration)
   */
-  double dt = static_cast<double>(t) * 0.02;
+  double dt = t * SECS_PER_TICK;
   double s = this->s + this->v * dt + this->a * dt * dt / 2;
   double v = this->v + this->a * dt;
-  if (this->is_ego) v = max(0.0, v); // don't allow the ego's velocity to go negative
+  if (this->is_ego) v = max(0.0, v);  // don't allow the ego's velocity to go negative
   return {static_cast<double>(this->lane), s, v, this->a};
 }
 
-bool Vehicle::collides_with(Vehicle other, int at_time) {
+bool Vehicle::collides_with(Vehicle other, double at_time) {
   /*
     Simple collision detection.
   */
-  vector<double> check1 = state_at(at_time);
+  vector<double> check1 = this->state_at(at_time);
   vector<double> check2 = other.state_at(at_time);
+
   return (check1[0] == check2[0]) && (abs(check1[1] - check2[1]) <= 1);
 }
 
@@ -233,7 +249,7 @@ Vehicle::collider Vehicle::will_collide_with(Vehicle other, int timesteps) {
   collider_temp.time = -1;
 
   for (int t = 0; t < timesteps + 1; t++) {
-    if (this->collides_with(other, t)) {
+    if (this->collides_with(other, static_cast<double>(t))) {
       collider_temp.collision = true;
       collider_temp.time = t;
       return collider_temp;
@@ -243,7 +259,7 @@ Vehicle::collider Vehicle::will_collide_with(Vehicle other, int timesteps) {
   return collider_temp;
 }
 
-void Vehicle::realize_state(map<int, vector<vector<int>>> predictions) {
+void Vehicle::realize_state(map<int, vector<vector<double>>> predictions) {
   /*
     Given a state, realize it by adjusting acceleration and lane.
     Note - lane changes happen instantaneously.
@@ -266,52 +282,65 @@ void Vehicle::realize_state(map<int, vector<vector<int>>> predictions) {
 }
 
 void Vehicle::realize_constant_speed() {
+  // set acceleration to zero for keeping a constant speed
   this->a = 0;
 }
 
-void Vehicle::realize_keep_lane(map<int, vector<vector<int>>> predictions) {
+void Vehicle::realize_keep_lane(map<int, vector<vector<double>>> predictions) {
+  // continue to get the acceleration for the current lane
   this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
 
-void Vehicle::realize_lane_change(map<int, vector<vector<int>>> predictions, string direction) {
+void Vehicle::realize_lane_change(map<int, vector<vector<double>>> predictions, string direction) {
+  // doing a lane change, so based on which direction (left/right)
+  // for the new lane being changed to, set a delta offset to
+  // represent the new lane
   double delta = 1;
 
   if (direction.compare("L") == 0) {
     delta = -1;
   }
 
+  // change to the new lane
   this->lane += delta;
 
+  // prevent straying beyond minimum or maximum lane positions
   this->lane = minmaxCarLaneNumber(this->lane);
 
+  // get acceleration for new lane
   this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
 
-double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, int lane, double ss) {
+double Vehicle::_max_accel_for_lane(map<int, vector<vector<double>>> predictions, int lane, double ss) {
+  // at each time step we need to gradually approach the target
+  // speed by ramping up the acceleration, to its maximum limit
   double delta_v_til_target = this->target_speed - this->v;
   double max_acc = min(this->max_acceleration, delta_v_til_target);
 
-  map<int, vector<vector<int>>>::iterator it = predictions.begin();
-  vector<vector<vector<int>>> in_front;
+  // build a list of all vehicles directly in front of the ego car
+  map<int, vector<vector<double>>>::iterator it = predictions.begin();
+  vector<vector<vector<double>>> in_front;
 
   while (it != predictions.end()) {
     int vv_id = it->first;
 
-    vector<vector<int>> vv = it->second;
+    vector<vector<double>> vv = it->second;
 
-    if ((vv[0][0] == lane) && (vv[0][1] > ss)) {
+    if ((static_cast<int>(vv[0][0]) == lane) && (vv[0][1] > ss)) {
       in_front.push_back(vv);
     }
 
     it++;
   }
 
+  // if there are any cars in front of the ego car, find
+  // the first car in the lane (the one directly ahead)
   this->in_front = in_front.size();
 
   if (this->in_front > 0) {
-    double min_s = 500.0;
+    double min_s = LEADING_HZ;  // how far to look ahead
 
-    vector<vector<int>> leading;
+    vector<vector<double>> leading;
 
     for (int i = 0; i < in_front.size(); i++) {
       if ((in_front[i][0][1] - ss) < min_s) {
@@ -320,47 +349,66 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<int>>> predictions, i
       }
     }
 
+    // now that we have found the car directly in front of the
+    // ego car, find where it will be next...
     double next_pos = leading.size() > 1 ? leading[1][1] : min_s;
+    // then find where the ego car will be next based on its speed
     double my_next = ss + this->v;
+    // find out how far apart they will be from each other at that time
     double separation_next = next_pos - my_next;
-    double available_room = separation_next - this->preferred_buffer;
+    // subtract a bit of buffer room for comfort, and that's the
+    // available room the ego car has to maneuver in
+    double available_room = separation_next - PREFERRED_BUFFER;
 
+    // keep going at current speed if there is available room,
+    // otherwise reduce speed...
     max_acc = min(max_acc, available_room);
+    // but don't let the acceleration fall below the minimum
     max_acc = max(max_acc, -1.0 * this->max_acceleration);
   }
 
   return max_acc;
 }
 
-void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions, string direction) {
+void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predictions, string direction) {
+  // prepping for a lane change, so based on which lane is
+  // going to be changed to, set a delta offset to represent
+  // the new lane
   int delta = 1;
 
   if (direction.compare("L") == 0) {
     delta = -1;
   }
 
+  // set the lane to check based on the delta offset value
   int lane = this->lane + delta;
 
-  map<int, vector<vector<int>>>::iterator it = predictions.begin();
+  // build a list of all vehicles next to or behind the ego
+  // car in that lane
+  map<int, vector<vector<double>>>::iterator it = predictions.begin();
 
-  vector<vector<vector<int>>> at_behind;
+  vector<vector<vector<double>>> at_behind;
 
   while (it != predictions.end()) {
     int v_id = it->first;
 
-    vector<vector<int>> v = it->second;
+    vector<vector<double>> v = it->second;
 
-    if ((v[0][0] == lane) && (v[0][1] <= this->s)) {
+    if ((static_cast<int>(v[0][0]) == lane) && (v[0][1] <= this->s)) {
       at_behind.push_back(v);
     }
 
     it++;
   }
 
-  if (at_behind.size() > 0) {
-    int max_s = -1000;
+  // if there are any cars found behind the ego car...
+  this->at_behind = at_behind.size();
 
-    vector<vector<int>> nearest_behind;
+  if (this->at_behind > 0) {
+    double max_s = -FOLLOW_HZ;  // how far to look behind
+
+    // find the closest vehicle behind the ego vehicle
+    vector<vector<double>> nearest_behind;
 
     for (int i = 0; i < at_behind.size(); i++) {
       if ((at_behind[i][0][1]) > max_s) {
@@ -369,11 +417,17 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions
       }
     }
 
-    double target_vel = static_cast<double>(nearest_behind[1][1] - nearest_behind[0][1]);
+    // get the diffence in the velocity of the trailing vehicle
+    double target_vel = nearest_behind[1][1] - nearest_behind[0][1];
+    // the ego car needs to change from its current velocity
     double delta_v = this->v - target_vel;
-    double delta_s = this->s - static_cast<double>(nearest_behind[0][1]);
+    // ...and the ego car needs to get behind the trailing vehicle
+    double delta_s = this->s - nearest_behind[0][1];
 
+    // if the trailing car is changing its velocity...
     if (delta_v != 0) {
+      // ...then we need to compute the acceleration value needed
+      // to match the change in order to get behind it
       double time = -2.0 * delta_s / delta_v;
       double aa;
 
@@ -383,6 +437,7 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions
         aa = delta_v / time;
       }
 
+      // keep acceleration within boundaries of min/max acceleration
       if (aa > this->max_acceleration) {
         aa = this->max_acceleration;
       }
@@ -393,21 +448,24 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<int>>> predictions
 
       this->a = aa;
     } else {
+      // if the trailing vehicle isn't changing its speed, then the
+      // ego car just needs to slow down
       double my_min_acc = max(-this->max_acceleration, -delta_s);
 
       this->a = my_min_acc;
     }
+  } else {
+    // otherwise with no cars found behind ego, continue at regular speed
+    this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
   }
-
-  this->a = this->_max_accel_for_lane(predictions, this->lane, this->s);
 }
 
-vector<vector<int>> Vehicle::generate_predictions(int horizon) {
-  vector<vector<int>> predictions;
+vector<vector<double>> Vehicle::generate_predictions(int horizon) {
+  vector<vector<double>> predictions;
 
   for (int i = 0; i < horizon; i++) {
-    vector<double> check = this->state_at(i);
-    vector<int> lane_s = {static_cast<int>(check[0]), static_cast<int>(check[1])};
+    vector<double> check = this->state_at(static_cast<double>(i));
+    vector<double> lane_s = {check[0], check[1]};
     predictions.push_back(lane_s);
   }
 
