@@ -22,9 +22,6 @@ struct TrajectoryData {
   double collides_at;
 };
 
-const int PLANNING_HORIZON = 1;//20;
-const double DESIRED_BUFFER = 10;
-
 class Vehicle;
 
 class Cost {

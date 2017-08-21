@@ -34,8 +34,8 @@ class Vehicle {
 
   int lanes_available;
   int lane;
-  int in_front;  // number of vehicles "in front" of ego vehicle
-  int at_behind; // number of vehicles "behind" ego vehicle
+  int in_front;   // number of vehicles "in front" of ego vehicle
+  int at_behind;  // number of vehicles "behind" ego vehicle
   bool is_ego;
 
   double s;
@@ -43,6 +43,7 @@ class Vehicle {
   double a;
   double target_speed;
   double max_acceleration;
+  double max_decceleration;
 
   string state;
 
@@ -68,7 +69,7 @@ class Vehicle {
 
   string display();
 
-  void increment(double dt = 1.0);
+  void increment(double dt = 1.0, bool overide = false);
 
   vector<double> state_at(double t);
 

@@ -21,13 +21,16 @@ Vehicle::Vehicle(int lane, double s, double v, double a, bool is_ego) {
     this->state = "CS";
 
     if (is_ego) {
-      // configure speed limit, num_lanes, max_acceleration, is_ego for ego vehicle
+      // configure speed limit, num_lanes, max_acceleration,
+      // max_decceleration, and is_ego for ego vehicle
       this->target_speed = EGO_MAX_VELOCITY;
       this->lanes_available = NUM_LANES;
       this->max_acceleration = EGO_MAX_ACCEL;
+      this->max_decceleration = EGO_MAX_DECEL;
       this->is_ego = true;
     } else {
       this->max_acceleration = 0;
+      this->max_decceleration = 0;
     }
 
     this->cost = Cost();
@@ -89,14 +92,23 @@ string Vehicle::get_next_state(map<int, vector <vector<double>>> predictions) {
   if (this->lane == 0) {  // left-hand lane
     states.erase(states.begin() + 4);
     states.erase(states.begin() + 3);
-    if (state.compare("KL") == 0) states.erase(states.begin() + 2);  // if in KL state, only allow transition to PLCR, not LCR
+
+    // if in KL state then only allow
+    // transition to PLCR, not LCR
+    if (state.compare("KL") == 0) states.erase(states.begin() + 2);
+
   } else if (this->lane == 1) {  // middle lane
+    // if in KL state, only allow transition
+    //  to PLCR or PLCL, not LCR or LCL
     if (state.compare("KL") == 0) {
-      states.erase(states.begin() + 4);  // if in KL state, only allow transition
-      states.erase(states.begin() + 2);  // to PLCR or PLCL, not LCR or LCL
+      states.erase(states.begin() + 4);
+      states.erase(states.begin() + 2);
     }
   } else if (this->lane == this->lanes_available - 1) {  // right-hand lane
-    if (state.compare("KL") == 0) states.erase(states.begin() + 4);  // if in KL state, only allow transition to PLCR, not LCR
+    // if in KL state, only allow transition
+    // to PLCR, not LCR
+    if (state.compare("KL") == 0) states.erase(states.begin() + 4);
+
     states.erase(states.begin() + 2);
     states.erase(states.begin() + 1);
   }
@@ -132,7 +144,7 @@ string Vehicle::min_cost_state(vector<string> states, vector<double> costs) {
       if (i > 0) cout << ", ";
       cout << states[i] << ": " << costs[i];
     }
-    
+
     if (costs[i] < best_cost) {
       best_cost = costs[i];
       best_state = states[i];
@@ -162,7 +174,7 @@ vector<Snapshot> Vehicle::trajectories_for_state(string state, map<int, vector<v
 
   for (int i = 0; i < horizon; i++) {
     // update the velocity and acceleration of ego out to the horizon
-    this->increment();
+    this->increment(1.0, true);
   }
 
   // save the trajectory results of the proposed state
@@ -207,12 +219,12 @@ string Vehicle::display() {
 // are "fer-realz" incrementing; otherwise calculated
 // s-value gets out of sync quickly with the actual
 // s-value from the simulator
-void Vehicle::increment(double dt) {
+void Vehicle::increment(double dt, bool overide) {
   double ddt = dt * SECS_PER_TICK;
 
   // NOTE: if we are updating the ego car, don't calculate the
   // s-value, keep the currently set value and don't vary it
-  if (this->is_ego) this->s += this->v * ddt;
+  if (!this->is_ego || overide) this->s += this->v * ddt;
 
   this->v += this->a * ddt;
 
@@ -349,22 +361,24 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<double>>> predictions
       }
     }
 
-    // now that we have found the car directly in front of the
-    // ego car, find where it will be next...
-    double next_pos = leading.size() > 1 ? leading[1][1] : min_s;
-    // then find where the ego car will be next based on its speed
-    double my_next = ss + this->v;
-    // find out how far apart they will be from each other at that time
-    double separation_next = next_pos - my_next;
-    // subtract a bit of buffer room for comfort, and that's the
-    // available room the ego car has to maneuver in
-    double available_room = separation_next - PREFERRED_BUFFER;
+    if (leading.size() > 1) {
+      // now that we have found the car directly in front of the
+      // ego car, find where it will be next...
+      double next_pos = leading[1][1];
+      // then find where the ego car will be next based on its speed
+      double my_next = ss + this->v;
+      // find out how far apart they will be from each other at that time
+      double separation_next = next_pos - my_next;
+      // subtract a bit of buffer room for comfort, and that's the
+      // available room the ego car has to maneuver in
+      double available_room = separation_next - PREFERRED_BUFFER;
 
-    // keep going at current speed if there is available room,
-    // otherwise reduce speed...
-    max_acc = min(max_acc, available_room);
-    // but don't let the acceleration fall below the minimum
-    max_acc = max(max_acc, -1.0 * this->max_acceleration);
+      // keep going at current speed if there is available room,
+      // otherwise reduce speed...
+      max_acc = min(max_acc, available_room);
+      // but don't let the acceleration fall below the minimum
+      max_acc = max(max_acc, -this->max_decceleration);
+    }
   }
 
   return max_acc;
@@ -442,15 +456,15 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predicti
         aa = this->max_acceleration;
       }
 
-      if (aa < -this->max_acceleration) {
-        aa = -this->max_acceleration;
+      if (aa < -this->max_decceleration) {
+        aa = -this->max_decceleration;
       }
 
       this->a = aa;
     } else {
       // if the trailing vehicle isn't changing its speed, then the
       // ego car just needs to slow down
-      double my_min_acc = max(-this->max_acceleration, -delta_s);
+      double my_min_acc = max(-this->max_decceleration, -delta_s);
 
       this->a = my_min_acc;
     }

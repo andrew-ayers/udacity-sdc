@@ -17,8 +17,8 @@ double Cost::calculate_cost(const Vehicle &vehicle, vector<Snapshot> trajectorie
   double cost = 0;
 
   cost += this->inefficiency_cost(vehicle, trajectories, predictions, trajectory_data);
-  //cost += this->collision_cost(vehicle, trajectories, predictions, trajectory_data);
-  //cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
+  cost += this->collision_cost(vehicle, trajectories, predictions, trajectory_data);
+  cost += this->buffer_cost(vehicle, trajectories, predictions, trajectory_data);
 
   return cost;
 }
@@ -136,9 +136,9 @@ double Cost::buffer_cost(Vehicle vehicle, vector<Snapshot> trajectories, map<int
   if (closest == 0) return 10 * DANGER;
 
   double timesteps_away = closest / data.avg_speed;
-  if (timesteps_away > DESIRED_BUFFER) return 0;
+  if (timesteps_away > PREFERRED_BUFFER) return 0;
 
-  double multiplier = 1 - pow((timesteps_away / DESIRED_BUFFER), 2);
+  double multiplier = 1 - pow((timesteps_away / PREFERRED_BUFFER), 2);
 
   return multiplier * DANGER;
 }
