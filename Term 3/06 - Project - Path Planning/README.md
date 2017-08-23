@@ -1,15 +1,3 @@
-# !!!! THIS CODE IS NOT COMPLETE - USE AND ABUSE AT YER OWN RISK !!!!
-
-See this thread: https://discussions.udacity.com/t/need-assistance-what-is-wrong-and-am-i-on-the-right-track-so-to-speak/339426
-
-# Update - August 21, 2017 @ 12:00a MST
-
-Ok - I won't say this code is perfect, nor the car fast. I won't say it works perfectly each and every time,
-but for the most part, it seems to do the job. In the /videos folder you can find a video recording of this
-code running, with the car navigating the freeway, changing lanes, etc - for a total of approximately 4.8
-miles. This is about as good as I can make it. I still have yet to compose my writeup, which will eventually
-replace this README.md here. I intend to get that done later today.
-
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
 
