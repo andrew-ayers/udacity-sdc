@@ -1,7 +1,6 @@
 # **<center>Term 3 - Project 1: Path Planning</center>**
 
-<center>![Title Image](https://raw.githubusercontent.com/andrew-ayers/udacity-sdc/master/Term%203/06%20-%20Project%20-%20Path%20Planning/images/self_driving_car_nanodegree_program.png "Title Image")
-</center>
+<center>![Title Image](images/self_driving_car_nanodegree_program.png)</center>
 
 ---
 ## Goals
