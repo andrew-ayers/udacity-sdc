@@ -1,6 +1,6 @@
 # **<center>Term 3 - Project 1: Path Planning</center>**
 
-<center>![Title Image](images/self_driving_car_nanodegree_program.png)</center>
+<center>![Title-Image](/images/self_driving_car_nanodegree_program.png)</center>
 
 ---
 ## Goals
